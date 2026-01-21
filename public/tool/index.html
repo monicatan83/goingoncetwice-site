@@ -290,6 +290,16 @@
       localStorage.setItem(storageKeys.history, JSON.stringify(state.history));
     }
 
+    function debounce(callback, wait) {
+      let timeoutId;
+      return (...args) => {
+        window.clearTimeout(timeoutId);
+        timeoutId = window.setTimeout(() => callback(...args), wait);
+      };
+    }
+
+    const saveFeaturesDebounced = debounce(saveFeatures, 300);
+
     function showScreen(screenToShow) {
       elements.setup.hidden = screenToShow !== "setup";
       elements.anchor.hidden = screenToShow !== "anchor";
@@ -331,8 +341,8 @@
         const value = scores[feature.id] ?? 0;
         row.innerHTML = `
           <div class="field">
-            <label>${feature.name}</label>
-            <div class="note">Importance: ${importanceLabels[feature.importance]}</div>
+            <label data-feature-label="${feature.id}">${feature.name}</label>
+            <div class="note" data-importance-label="${feature.id}">Importance: ${importanceLabels[feature.importance]}</div>
           </div>
           <div class="field">
             <label>Score (0-5)</label>
@@ -469,6 +479,23 @@
       });
     }
 
+    function updateFeatureLabels(featureId) {
+      const feature = state.features.find((item) => item.id === featureId);
+      if (!feature) return;
+      const labelSelector = `[data-feature-label="${featureId}"]`;
+      const importanceSelector = `[data-importance-label="${featureId}"]`;
+      [elements.anchorScores, elements.compareScores].forEach((container) => {
+        const label = container.querySelector(labelSelector);
+        if (label) {
+          label.textContent = feature.name;
+        }
+        const importance = container.querySelector(importanceSelector);
+        if (importance) {
+          importance.textContent = `Importance: ${importanceLabels[feature.importance]}`;
+        }
+      });
+    }
+
     function rebuildUI() {
       renderFeatures();
       syncAnchorScores();
@@ -498,8 +525,9 @@
         const feature = state.features.find((item) => item.id === event.target.dataset.id);
         if (feature) {
           feature.name = event.target.value;
-          saveFeatures();
-          rebuildUI();
+          saveFeaturesDebounced();
+          updateFeatureLabels(feature.id);
+          updateCeiling();
         }
       }
     });
@@ -510,7 +538,8 @@
         if (feature) {
           feature.importance = Number(event.target.value);
           saveFeatures();
-          rebuildUI();
+          updateFeatureLabels(feature.id);
+          updateCeiling();
         }
       }
     });
