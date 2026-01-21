@@ -479,6 +479,13 @@
       });
     }
 
+    function buildBlankScores() {
+      return state.features.reduce((scores, feature) => {
+        scores[feature.id] = 0;
+        return scores;
+      }, {});
+    }
+
     function updateFeatureLabels(featureId) {
       const feature = state.features.find((item) => item.id === featureId);
       if (!feature) return;
@@ -508,6 +515,15 @@
       });
       updateCeiling();
       renderHistory();
+    }
+
+    function resetCompareForm() {
+      elements.compareName.value = "";
+      renderScoreSelectors(elements.compareScores, buildBlankScores(), () => {
+        updateCeiling();
+      });
+      updateCeiling();
+      elements.compareName.focus();
     }
 
     document.getElementById("add-feature").addEventListener("click", () => {
@@ -601,11 +617,7 @@
     });
 
     document.getElementById("compare-another").addEventListener("click", () => {
-      elements.compareName.value = "";
-      elements.compareScores.querySelectorAll("select[data-score]").forEach((select) => {
-        select.value = "0";
-      });
-      updateCeiling();
+      resetCompareForm();
     });
 
     elements.anchorName.addEventListener("input", (event) => {
