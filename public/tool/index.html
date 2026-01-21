@@ -1,0 +1,609 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Bid Ceiling Calculator</title>
+  <meta name="description" content="Compare properties with a consistent, feature-weighted bid ceiling." />
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #111;
+      --muted: #5b5b5b;
+      --line: #e5e5e5;
+      --accent: #0a0a0a;
+      --bg: #ffffff;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      color: var(--ink);
+      background: var(--bg);
+    }
+    header {
+      padding: 18px 18px 10px;
+      border-bottom: 1px solid var(--line);
+    }
+    header h1 { margin: 0 0 4px; font-size: 22px; }
+    header p { margin: 0; color: var(--muted); font-size: 14px; }
+    main { padding: 18px; max-width: 960px; margin: 0 auto; }
+    .card {
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 16px;
+      margin-bottom: 16px;
+      background: #fff;
+    }
+    .step-title { margin-top: 0; font-size: 18px; }
+    .note {
+      border-left: 4px solid var(--accent);
+      padding-left: 12px;
+      color: var(--muted);
+      font-size: 14px;
+    }
+    .field {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      margin-bottom: 12px;
+    }
+    label { font-size: 14px; font-weight: 600; }
+    input[type="text"],
+    input[type="number"],
+    select {
+      padding: 10px 12px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      font-size: 15px;
+    }
+    .grid-two {
+      display: grid;
+      gap: 10px;
+      grid-template-columns: 1fr;
+    }
+    .feature-row {
+      display: grid;
+      gap: 8px;
+      grid-template-columns: 1fr;
+      align-items: center;
+      padding: 8px 0;
+      border-bottom: 1px dashed #efefef;
+    }
+    .feature-row:last-child { border-bottom: none; }
+    .row-actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 12px 14px;
+      border-radius: 12px;
+      border: 1px solid var(--accent);
+      background: #fff;
+      color: var(--accent);
+      text-decoration: none;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .btn.primary { background: var(--accent); color: #fff; }
+    .btn.ghost { border-color: var(--line); color: var(--muted); }
+    .btn.small { padding: 8px 10px; font-size: 13px; }
+    .stack {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .output {
+      background: #f8f8f8;
+      border-radius: 12px;
+      padding: 12px;
+      font-size: 15px;
+    }
+    .output strong { font-size: 20px; }
+    .tag {
+      display: inline-flex;
+      align-items: center;
+      padding: 4px 10px;
+      border-radius: 999px;
+      background: #efefef;
+      font-size: 12px;
+      margin-right: 6px;
+    }
+    .history-item {
+      padding: 10px 0;
+      border-bottom: 1px solid var(--line);
+      font-size: 14px;
+    }
+    .history-item:last-child { border-bottom: none; }
+    @media (min-width: 720px) {
+      header { padding: 22px 24px; }
+      main { padding: 24px; }
+      .grid-two { grid-template-columns: 1fr 1fr; }
+      .feature-row {
+        grid-template-columns: 1.2fr 0.8fr 0.6fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Bid Ceiling Calculator</h1>
+    <p>Set your anchor, compare a property, and get a ceiling price you can trust.</p>
+  </header>
+  <main>
+    <div class="card note">
+      Use this only for properties that already meet your non-negotiables.
+    </div>
+
+    <section id="setup-screen" class="card">
+      <h2 class="step-title">Step 1: Set up your feature list</h2>
+      <p class="note">Add the features you care about and weight them by importance.</p>
+      <div id="features-list"></div>
+      <div class="row-actions" style="margin-top:12px;">
+        <button id="add-feature" class="btn ghost">Add feature</button>
+        <button id="next-to-anchor" class="btn primary">Next: Set anchor</button>
+      </div>
+    </section>
+
+    <section id="anchor-screen" class="card" hidden>
+      <h2 class="step-title">Step 2: Anchor property</h2>
+      <div class="grid-two">
+        <div class="field">
+          <label for="anchor-name">Anchor name</label>
+          <input id="anchor-name" type="text" placeholder="e.g. 12 Smith St" />
+        </div>
+        <div class="field">
+          <label for="anchor-price">Anchor price (A$)</label>
+          <input id="anchor-price" type="number" inputmode="decimal" min="0" placeholder="850000" />
+        </div>
+      </div>
+      <div id="anchor-scores"></div>
+      <div class="row-actions" style="margin-top:12px;">
+        <button id="back-to-setup" class="btn ghost">Back</button>
+        <button id="save-anchor" class="btn primary">Save anchor &amp; continue</button>
+      </div>
+    </section>
+
+    <section id="compare-screen" class="card" hidden>
+      <h2 class="step-title">Step 3: Compare a new property</h2>
+      <div class="field">
+        <label for="compare-name">Property name</label>
+        <input id="compare-name" type="text" placeholder="e.g. 24 Jones Rd" />
+      </div>
+      <div id="compare-scores"></div>
+      <div class="output" aria-live="polite">
+        <div><span class="tag">Suggested ceiling</span> <strong id="ceiling-price">—</strong></div>
+        <div style="margin-top:6px;"><span class="tag">Delta vs anchor</span> <span id="ceiling-delta">—</span></div>
+        <div style="margin-top:10px;">
+          <strong>Top reasons</strong>
+          <ul id="top-reasons" class="stack" style="margin:6px 0 0; padding-left:18px;"></ul>
+        </div>
+      </div>
+      <div class="row-actions" style="margin-top:12px;">
+        <button id="save-comparison" class="btn">Save comparison</button>
+        <button id="compare-another" class="btn ghost">Compare another</button>
+      </div>
+    </section>
+
+    <section id="history-screen" class="card" hidden>
+      <h2 class="step-title">Saved comparisons</h2>
+      <div id="history-list"></div>
+    </section>
+  </main>
+
+  <script>
+    const dollarsPerPoint = 3000;
+
+    // localStorage keys used by this tool.
+    const storageKeys = {
+      features: "gott_bid_ceiling_features",
+      anchor: "gott_bid_ceiling_anchor",
+      history: "gott_bid_ceiling_history"
+    };
+
+    const importanceLabels = {
+      1: "Nice-to-have",
+      2: "Important",
+      3: "Very important",
+      4: "Essential"
+    };
+
+    const defaultFeatures = Array.from({ length: 8 }, (_, index) => ({
+      id: crypto.randomUUID(),
+      name: `Feature ${index + 1}`,
+      importance: 2
+    }));
+
+    const state = {
+      features: loadFeatures(),
+      anchor: loadAnchor(),
+      history: loadHistory()
+    };
+
+    const elements = {
+      setup: document.getElementById("setup-screen"),
+      anchor: document.getElementById("anchor-screen"),
+      compare: document.getElementById("compare-screen"),
+      history: document.getElementById("history-screen"),
+      featuresList: document.getElementById("features-list"),
+      anchorScores: document.getElementById("anchor-scores"),
+      compareScores: document.getElementById("compare-scores"),
+      historyList: document.getElementById("history-list"),
+      anchorName: document.getElementById("anchor-name"),
+      anchorPrice: document.getElementById("anchor-price"),
+      compareName: document.getElementById("compare-name"),
+      ceilingPrice: document.getElementById("ceiling-price"),
+      ceilingDelta: document.getElementById("ceiling-delta"),
+      topReasons: document.getElementById("top-reasons")
+    };
+
+    function loadFeatures() {
+      const saved = localStorage.getItem(storageKeys.features);
+      if (!saved) return defaultFeatures;
+      try {
+        return JSON.parse(saved);
+      } catch {
+        return defaultFeatures;
+      }
+    }
+
+    function loadAnchor() {
+      const saved = localStorage.getItem(storageKeys.anchor);
+      if (!saved) {
+        return {
+          name: "",
+          price: "",
+          scores: {}
+        };
+      }
+      try {
+        return JSON.parse(saved);
+      } catch {
+        return { name: "", price: "", scores: {} };
+      }
+    }
+
+    function loadHistory() {
+      const saved = localStorage.getItem(storageKeys.history);
+      if (!saved) return [];
+      try {
+        return JSON.parse(saved);
+      } catch {
+        return [];
+      }
+    }
+
+    function saveFeatures() {
+      localStorage.setItem(storageKeys.features, JSON.stringify(state.features));
+    }
+
+    function saveAnchor() {
+      localStorage.setItem(storageKeys.anchor, JSON.stringify(state.anchor));
+    }
+
+    function saveHistory() {
+      localStorage.setItem(storageKeys.history, JSON.stringify(state.history));
+    }
+
+    function showScreen(screenToShow) {
+      elements.setup.hidden = screenToShow !== "setup";
+      elements.anchor.hidden = screenToShow !== "anchor";
+      elements.compare.hidden = screenToShow !== "compare";
+      elements.history.hidden = screenToShow !== "history";
+    }
+
+    function renderFeatures() {
+      elements.featuresList.innerHTML = "";
+      state.features.forEach((feature) => {
+        const row = document.createElement("div");
+        row.className = "feature-row";
+        row.innerHTML = `
+          <div class="field">
+            <label>Feature name</label>
+            <input type="text" value="${feature.name}" data-id="${feature.id}" />
+          </div>
+          <div class="field">
+            <label>Importance</label>
+            <select data-importance="${feature.id}">
+              ${Object.entries(importanceLabels)
+                .map(([value, label]) => `<option value="${value}" ${Number(value) === feature.importance ? "selected" : ""}>${value} — ${label}</option>`)
+                .join("")}
+            </select>
+          </div>
+          <div class="row-actions">
+            <button class="btn small ghost" data-delete="${feature.id}">Delete</button>
+          </div>
+        `;
+        elements.featuresList.appendChild(row);
+      });
+    }
+
+    function renderScoreSelectors(container, scores, onChange) {
+      container.innerHTML = "";
+      state.features.forEach((feature) => {
+        const row = document.createElement("div");
+        row.className = "feature-row";
+        const value = scores[feature.id] ?? 0;
+        row.innerHTML = `
+          <div class="field">
+            <label>${feature.name}</label>
+            <div class="note">Importance: ${importanceLabels[feature.importance]}</div>
+          </div>
+          <div class="field">
+            <label>Score (0-5)</label>
+            <select data-score="${feature.id}">
+              ${Array.from({ length: 6 }, (_, index) => `<option value="${index}" ${index === value ? "selected" : ""}>${index}</option>`).join("")}
+            </select>
+          </div>
+          <div></div>
+        `;
+        container.appendChild(row);
+      });
+
+      container.querySelectorAll("select[data-score]").forEach((select) => {
+        select.addEventListener("change", (event) => {
+          const featureId = event.target.dataset.score;
+          onChange(featureId, Number(event.target.value));
+        });
+      });
+    }
+
+    function calculateUtility(scores) {
+      return state.features.reduce((total, feature) => {
+        const score = Number(scores[feature.id] ?? 0);
+        return total + feature.importance * score;
+      }, 0);
+    }
+
+    function formatCurrency(value) {
+      if (!Number.isFinite(value)) return "—";
+      return new Intl.NumberFormat("en-AU", {
+        style: "currency",
+        currency: "AUD",
+        maximumFractionDigits: 0
+      }).format(value);
+    }
+
+    function formatDelta(value) {
+      if (!Number.isFinite(value)) return "—";
+      const sign = value > 0 ? "+" : value < 0 ? "-" : "";
+      return `${sign}${formatCurrency(Math.abs(value))}`;
+    }
+
+    function updateCeiling() {
+      const anchorPrice = Number(state.anchor.price);
+      if (!anchorPrice || !state.anchor.name) {
+        elements.ceilingPrice.textContent = "Add anchor details";
+        elements.ceilingDelta.textContent = "—";
+        elements.topReasons.innerHTML = "";
+        return;
+      }
+
+      const anchorUtility = calculateUtility(state.anchor.scores);
+      const compareScores = getCurrentCompareScores();
+      const compareUtility = calculateUtility(compareScores);
+
+      // Ceiling formula: anchorPrice + (U_new - U_anchor) * dollarsPerPoint.
+      const rawCeiling = anchorPrice + (compareUtility - anchorUtility) * dollarsPerPoint;
+      const roundedCeiling = Math.round(rawCeiling / 5000) * 5000;
+      const delta = roundedCeiling - anchorPrice;
+
+      elements.ceilingPrice.textContent = formatCurrency(roundedCeiling);
+      elements.ceilingDelta.textContent = formatDelta(delta);
+
+      const contributions = state.features.map((feature) => {
+        const compareScore = Number(compareScores[feature.id] ?? 0);
+        const anchorScore = Number(state.anchor.scores[feature.id] ?? 0);
+        const difference = compareScore - anchorScore;
+        const value = difference * feature.importance * dollarsPerPoint;
+        return {
+          name: feature.name,
+          value
+        };
+      });
+
+      const top = contributions
+        .filter((item) => item.value !== 0)
+        .sort((a, b) => Math.abs(b.value) - Math.abs(a.value))
+        .slice(0, 3);
+
+      elements.topReasons.innerHTML = "";
+      if (top.length === 0) {
+        const item = document.createElement("li");
+        item.textContent = "No feature differences yet.";
+        elements.topReasons.appendChild(item);
+        return;
+      }
+
+      top.forEach((item) => {
+        const li = document.createElement("li");
+        li.textContent = `${item.name}: ${formatDelta(item.value)}`;
+        elements.topReasons.appendChild(li);
+      });
+    }
+
+    function getCurrentCompareScores() {
+      const scores = {};
+      elements.compareScores.querySelectorAll("select[data-score]").forEach((select) => {
+        scores[select.dataset.score] = Number(select.value);
+      });
+      return scores;
+    }
+
+    function renderHistory() {
+      elements.historyList.innerHTML = "";
+      if (state.history.length === 0) {
+        elements.historyList.textContent = "No saved comparisons yet.";
+        return;
+      }
+      state.history.slice().reverse().forEach((entry) => {
+        const div = document.createElement("div");
+        div.className = "history-item";
+        div.innerHTML = `
+          <strong>${entry.name}</strong><br />
+          <span class="muted">${new Date(entry.timestamp).toLocaleString()} · Ceiling ${formatCurrency(entry.ceiling)}</span>
+        `;
+        elements.historyList.appendChild(div);
+      });
+    }
+
+    function syncAnchorScores() {
+      state.features.forEach((feature) => {
+        if (!(feature.id in state.anchor.scores)) {
+          state.anchor.scores[feature.id] = 0;
+        }
+      });
+    }
+
+    function syncCompareScores() {
+      const compareScores = getCurrentCompareScores();
+      state.features.forEach((feature) => {
+        if (!(feature.id in compareScores)) {
+          compareScores[feature.id] = 0;
+        }
+      });
+    }
+
+    function rebuildUI() {
+      renderFeatures();
+      syncAnchorScores();
+      renderScoreSelectors(elements.anchorScores, state.anchor.scores, (featureId, value) => {
+        state.anchor.scores[featureId] = value;
+        saveAnchor();
+      });
+      renderScoreSelectors(elements.compareScores, getCurrentCompareScores(), () => {
+        updateCeiling();
+      });
+      updateCeiling();
+      renderHistory();
+    }
+
+    document.getElementById("add-feature").addEventListener("click", () => {
+      state.features.push({
+        id: crypto.randomUUID(),
+        name: "New feature",
+        importance: 2
+      });
+      saveFeatures();
+      rebuildUI();
+    });
+
+    elements.featuresList.addEventListener("input", (event) => {
+      if (event.target.matches("input[type='text']")) {
+        const feature = state.features.find((item) => item.id === event.target.dataset.id);
+        if (feature) {
+          feature.name = event.target.value;
+          saveFeatures();
+          rebuildUI();
+        }
+      }
+    });
+
+    elements.featuresList.addEventListener("change", (event) => {
+      if (event.target.matches("select[data-importance]")) {
+        const feature = state.features.find((item) => item.id === event.target.dataset.importance);
+        if (feature) {
+          feature.importance = Number(event.target.value);
+          saveFeatures();
+          rebuildUI();
+        }
+      }
+    });
+
+    elements.featuresList.addEventListener("click", (event) => {
+      if (event.target.matches("button[data-delete]")) {
+        const featureId = event.target.dataset.delete;
+        state.features = state.features.filter((item) => item.id !== featureId);
+        delete state.anchor.scores[featureId];
+        saveFeatures();
+        saveAnchor();
+        rebuildUI();
+      }
+    });
+
+    document.getElementById("next-to-anchor").addEventListener("click", () => {
+      showScreen("anchor");
+    });
+
+    document.getElementById("back-to-setup").addEventListener("click", () => {
+      showScreen("setup");
+    });
+
+    document.getElementById("save-anchor").addEventListener("click", () => {
+      if (!elements.anchorName.value.trim() || !elements.anchorPrice.value) {
+        alert("Please enter an anchor name and price.");
+        return;
+      }
+      state.anchor.name = elements.anchorName.value.trim();
+      state.anchor.price = Number(elements.anchorPrice.value);
+      saveAnchor();
+      showScreen("compare");
+      updateCeiling();
+    });
+
+    document.getElementById("save-comparison").addEventListener("click", () => {
+      const compareName = elements.compareName.value.trim();
+      if (!compareName) {
+        alert("Please enter a property name.");
+        return;
+      }
+      const anchorPrice = Number(state.anchor.price);
+      const anchorUtility = calculateUtility(state.anchor.scores);
+      const compareScores = getCurrentCompareScores();
+      const compareUtility = calculateUtility(compareScores);
+
+      const rawCeiling = anchorPrice + (compareUtility - anchorUtility) * dollarsPerPoint;
+      const roundedCeiling = Math.round(rawCeiling / 5000) * 5000;
+
+      state.history.push({
+        name: compareName,
+        timestamp: new Date().toISOString(),
+        scores: compareScores,
+        ceiling: roundedCeiling
+      });
+      saveHistory();
+      renderHistory();
+      elements.history.hidden = false;
+    });
+
+    document.getElementById("compare-another").addEventListener("click", () => {
+      elements.compareName.value = "";
+      elements.compareScores.querySelectorAll("select[data-score]").forEach((select) => {
+        select.value = "0";
+      });
+      updateCeiling();
+    });
+
+    elements.anchorName.addEventListener("input", (event) => {
+      state.anchor.name = event.target.value;
+      saveAnchor();
+    });
+
+    elements.anchorPrice.addEventListener("input", (event) => {
+      state.anchor.price = event.target.value;
+      saveAnchor();
+      updateCeiling();
+    });
+
+    elements.compareScores.addEventListener("change", () => {
+      updateCeiling();
+    });
+
+    if (state.anchor.name || state.anchor.price) {
+      elements.anchorName.value = state.anchor.name;
+      elements.anchorPrice.value = state.anchor.price;
+    }
+
+    rebuildUI();
+    showScreen(state.anchor.name && state.anchor.price ? "compare" : "setup");
+    if (state.history.length > 0) {
+      elements.history.hidden = false;
+    }
+  </script>
+</body>
+</html>
