@@ -187,6 +187,7 @@
       <div class="row-actions" style="margin-top:12px;">
         <button id="save-comparison" class="btn">Save comparison</button>
         <button id="compare-another" class="btn ghost">Compare another</button>
+        <button id="new-anchor" class="btn ghost">Set new anchor</button>
       </div>
     </section>
 
@@ -526,6 +527,17 @@
       elements.compareName.focus();
     }
 
+    function resetAnchor() {
+      state.anchor = {
+        name: "",
+        price: "",
+        scores: buildBlankScores()
+      };
+      elements.anchorName.value = "";
+      elements.anchorPrice.value = "";
+      saveAnchor();
+    }
+
     document.getElementById("add-feature").addEventListener("click", () => {
       state.features.push({
         id: crypto.randomUUID(),
@@ -618,6 +630,13 @@
 
     document.getElementById("compare-another").addEventListener("click", () => {
       resetCompareForm();
+    });
+
+    document.getElementById("new-anchor").addEventListener("click", () => {
+      resetAnchor();
+      resetCompareForm();
+      rebuildUI();
+      showScreen("setup");
     });
 
     elements.anchorName.addEventListener("input", (event) => {
